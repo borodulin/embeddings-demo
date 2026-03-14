@@ -11,7 +11,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "import:data": "tsx scripts/import-data.ts --dir ./import",
     "index:vectors": "tsx scripts/index-vectors.ts",
-    "get:vector": "tsx scripts/get-vector.ts"
+    "get:vector": "tsx scripts/get-vector.ts",
+    "smoke:index:openai": "tsx scripts/smoke-openai-index.ts"
   },
   "dependencies": {
     "csv-parse": "^6.1.0",
@@ -21,6 +22,7 @@
     "postgres": "^3.4.8",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "undici": "^7.24.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {

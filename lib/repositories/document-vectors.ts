@@ -96,6 +96,37 @@ const listDocumentsForModelIndexingInternal = async (
     [limit],
   ) as Promise<DocumentIndexRow[]>;
 
+const claimDocumentsForModelIndexingInternal = async (
+  tableName: string,
+  limit: number,
+): Promise<DocumentIndexRow[]> =>
+  sql.unsafe(
+    `
+      WITH claimed AS (
+        SELECT v.document_id
+        FROM ${tableName} v
+        WHERE v.embedding IS NULL
+          AND v.indexing_status IN ('pending', 'error')
+        ORDER BY v.document_id
+        FOR UPDATE SKIP LOCKED
+        LIMIT $1
+      ),
+      marked AS (
+        UPDATE ${tableName} v
+        SET indexing_status = 'indexing',
+            indexing_error = NULL
+        FROM claimed c
+        WHERE v.document_id = c.document_id
+        RETURNING v.document_id
+      )
+      SELECT d.id, d.path, d.title
+      FROM marked m
+      JOIN documents d ON d.id = m.document_id
+      ORDER BY d.id
+    `,
+    [limit],
+  ) as Promise<DocumentIndexRow[]>;
+
 const searchDocumentsByModelInternal = async (
   tableName: string,
   embeddingLiteral: string,
@@ -148,6 +179,11 @@ export const listDocumentsForModelIndexing = async (
   model: EmbeddingModel,
   limit: number,
 ): Promise<DocumentIndexRow[]> => listDocumentsForModelIndexingInternal(getVectorTableName(model), limit);
+
+export const claimDocumentsForModelIndexing = async (
+  model: EmbeddingModel,
+  limit: number,
+): Promise<DocumentIndexRow[]> => claimDocumentsForModelIndexingInternal(getVectorTableName(model), limit);
 
 export const searchDocumentsByModel = async (
   model: EmbeddingModel,

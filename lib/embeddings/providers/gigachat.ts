@@ -11,6 +11,12 @@ type GigaChatProviderParams = {
 
 let gigaChatTokenCache: { accessToken: string; expiresAtMs: number } | null = null;
 
+// GigaChat OAuth endpoint may present a cert chain unavailable in local environments.
+// Keep runtime behavior consistent with CLI scripts (`scripts/_shared/env.ts`).
+if (!process.env.NODE_TLS_REJECT_UNAUTHORIZED) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 const getGigaChatToken = async ({
   oauthUrl,
   authKey,

@@ -64,6 +64,12 @@ npm run index:vectors
 npm run index:vectors -- --limit 100
 ```
 
+Smoke-тест только для OpenAI-индексации (создаёт 1 pending-запись, индексирует и проверяет статус `indexed`):
+
+```bash
+npm run smoke:index:openai
+```
+
 `--limit` трактуется как `limit per model` (то же, что `--limit-per-model`).
 Пример явного указания:
 
@@ -78,6 +84,19 @@ npm run index:vectors -- --model qwen3_embedding_0_6b
 ```
 
 Доступные значения `--model`: `qwen3_embedding_0_6b`, `gigachat`, `text_embedding_3_small`.
+
+Скорость индексации регулируется через `INDEX_CONCURRENCY` (по умолчанию `8`, максимум `32`):
+
+```bash
+INDEX_CONCURRENCY=16 npm run index:vectors -- --model text_embedding_3_small
+```
+
+Для OpenAI дополнительно можно настраивать размер batch-запроса embeddings через
+`OPENAI_EMBED_BATCH_SIZE` (по умолчанию `16`, максимум `128`):
+
+```bash
+INDEX_CONCURRENCY=8 OPENAI_EMBED_BATCH_SIZE=32 npm run index:vectors -- --model text_embedding_3_small
+```
 
 ## Диагностика: получить вектор по модели
 

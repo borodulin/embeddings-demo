@@ -2,7 +2,7 @@ import { config } from "./config";
 import type { EmbeddingModel } from "./models";
 import { ensureEmbeddingDim } from "./vector";
 import { embedWithGigaChatProvider } from "./embeddings/providers/gigachat";
-import { embedWithOpenAiProvider } from "./embeddings/providers/openai";
+import { embedManyWithOpenAiProvider, embedWithOpenAiProvider } from "./embeddings/providers/openai";
 import { embedWithQwenProvider } from "./embeddings/providers/qwen";
 
 const normalizeVector = (value: unknown, model: EmbeddingModel): number[] => {
@@ -61,4 +61,29 @@ export const embedText = async (input: string, model: EmbeddingModel): Promise<n
         model,
       );
   }
+};
+
+export const embedTexts = async (inputs: string[], model: EmbeddingModel): Promise<number[][]> => {
+  if (inputs.length === 0) {
+    return [];
+  }
+
+  if (model !== "text_embedding_3_small") {
+    return Promise.all(inputs.map((input) => embedText(input, model)));
+  }
+
+  const values = await embedManyWithOpenAiProvider({
+    baseUrl: config.embeddingsApiUrls.text_embedding_3_small,
+    proxyUrl: config.openAiProxyUrl,
+    input: inputs,
+    modelName: config.embeddingsProviderModelNames.text_embedding_3_small,
+    apiKey: config.openAiApiKey,
+    organization: config.openAiOrganization,
+  });
+
+  if (!values || values.length !== inputs.length) {
+    throw new Error("Embeddings API error: unexpected number of vectors in batch response");
+  }
+
+  return values.map((value) => normalizeVector(value, model));
 };

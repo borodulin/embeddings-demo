@@ -1,6 +1,8 @@
 import "./_shared/env";
 
 import { EMBEDDING_MODELS, isEmbeddingModel, type EmbeddingModel } from "../lib/models";
+import { sql as appDb } from "../lib/db";
+import { closeOpenAiProxyAgents } from "../lib/embeddings/providers/openai";
 import { indexPendingVectorsByModel } from "../lib/services/index-documents";
 import { getArg, parseOptionalIntArg, toInt } from "./_shared/cli";
 
@@ -29,7 +31,7 @@ async function main() {
     );
   }
 
-  const modelsToIndex: EmbeddingModel[] = modelArg ? [modelArg] : [...EMBEDDING_MODELS];
+  const modelsToIndex: EmbeddingModel[] = modelArg ? [modelArg as EmbeddingModel] : [...EMBEDDING_MODELS];
 
   let processedTotal = 0;
   const indexedByModel: Record<EmbeddingModel, number> = {
@@ -61,7 +63,12 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await closeOpenAiProxyAgents();
+    await appDb.end();
+  });

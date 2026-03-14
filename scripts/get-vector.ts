@@ -1,6 +1,7 @@
 import "./_shared/env";
 
 import { embedText } from "../lib/embeddings";
+import { closeOpenAiProxyAgents } from "../lib/embeddings/providers/openai";
 import { EMBEDDING_MODELS, isEmbeddingModel } from "../lib/models";
 import { getArg } from "./_shared/cli";
 
@@ -46,7 +47,11 @@ async function main() {
   console.log("Tip: add --json to print full vector.");
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+main()
+  .catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await closeOpenAiProxyAgents();
+  });
