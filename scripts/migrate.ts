@@ -1,14 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import postgres from "postgres";
+import { createScriptDb } from "./_shared/db";
 
-const databaseUrl =
-  process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/embeddings_demo";
-
-const client = postgres(databaseUrl, {
-  max: 1,
-});
+const client = createScriptDb();
 
 async function main() {
   const migrationsDir = path.resolve(process.cwd(), "drizzle");

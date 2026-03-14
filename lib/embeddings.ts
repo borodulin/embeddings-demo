@@ -1,5 +1,5 @@
-import { config } from "@/lib/config";
-import { ensureEmbeddingDim } from "@/lib/vector";
+import { config } from "./config";
+import { ensureEmbeddingDim } from "./vector";
 
 const normalizeVector = (value: unknown): number[] => {
   if (!Array.isArray(value)) {

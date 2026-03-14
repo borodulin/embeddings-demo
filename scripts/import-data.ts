@@ -3,28 +3,20 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 
 import { parse } from "csv-parse";
-import postgres from "postgres";
+
+import { getArg, parseOptionalIntArg } from "./_shared/cli";
+import { createScriptDb } from "./_shared/db";
 
 type ImportItem = {
   path: string;
   chunkIndex: number;
   title: string;
-  content: string;
-};
-
-const config = {
-  databaseUrl: process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/embeddings_demo",
 };
 
 const args = process.argv.slice(2);
-const getArg = (name: string) => {
-  const idx = args.findIndex((arg) => arg === name);
-  return idx >= 0 ? args[idx + 1] : undefined;
-};
-
-const requestedDir = getArg("--dir") ?? "./import";
-const limitArg = getArg("--limit");
-const limit = limitArg ? Number.parseInt(limitArg, 10) : undefined;
+const requestedDir = getArg(args, "--dir") ?? "./import";
+const limitArg = getArg(args, "--limit");
+const limit = parseOptionalIntArg(limitArg);
 
 const chunkText = (text: string, chunkSize = 1000, overlap = 200): string[] => {
   if (text.length <= chunkSize) {
@@ -44,17 +36,6 @@ const chunkText = (text: string, chunkSize = 1000, overlap = 200): string[] => {
   }
 
   return chunks;
-};
-
-const findBestContentField = (row: Record<string, string>): string | undefined => {
-  const candidates = ["content", "text", "description", "name", "title", "category_name"];
-  for (const key of candidates) {
-    const value = row[key];
-    if (value && value.trim().length > 0) {
-      return value;
-    }
-  }
-  return undefined;
 };
 
 const findBestTitleField = (row: Record<string, string>, fallback: string): string => {
@@ -95,7 +76,6 @@ async function* importItemsFromFile(filePath: string): AsyncGenerator<ImportItem
         path: `${fileName}#${i}`,
         chunkIndex: i,
         title: `${fileName} #${i}`,
-        content: chunk.trim(),
       };
     }
     return;
@@ -111,15 +91,10 @@ async function* importItemsFromFile(filePath: string): AsyncGenerator<ImportItem
         continue;
       }
       const record = row as Record<string, unknown>;
-      const content = String(record.content ?? record.text ?? "").trim();
-      if (!content) {
-        continue;
-      }
       yield {
         path: String(record.path ?? record.full_path ?? record.category_path ?? `${fileName}#${idx}`).slice(0, 2000),
         chunkIndex: idx,
         title: String(record.title ?? `${fileName} #${idx}`).slice(0, 200),
-        content,
       };
       idx += 1;
     }
@@ -133,16 +108,11 @@ async function* importItemsFromFile(filePath: string): AsyncGenerator<ImportItem
 
     let idx = 0;
     for await (const row of parser as AsyncIterable<Record<string, string>>) {
-      const content = findBestContentField(row)?.trim();
-      if (!content) {
-        continue;
-      }
       const pathValue = findBestPathField(row, `${fileName}#${idx}`);
       yield {
         path: pathValue,
         chunkIndex: idx,
         title: findBestTitleField(row, `${fileName} #${idx}`),
-        content: content.slice(0, 5000),
       };
       idx += 1;
     }
@@ -167,7 +137,7 @@ const resolveImportDir = async (value: string): Promise<string> => {
 
 async function main() {
   const dirPath = await resolveImportDir(requestedDir);
-  const sql = postgres(config.databaseUrl, { max: 1 });
+  const sql = createScriptDb();
 
   const files = (await fsp.readdir(dirPath))
     .map((name) => path.join(dirPath, name))
@@ -190,13 +160,12 @@ async function main() {
       }
 
       await sql`
-        INSERT INTO documents (path, chunk_index, title, content, indexing_status, indexing_error, indexed_at)
-        VALUES (${item.path}, ${item.chunkIndex}, ${item.title}, ${item.content}, 'pending', NULL, NULL)
+        INSERT INTO documents (path, chunk_index, title, indexing_status, indexing_error, indexed_at)
+        VALUES (${item.path}, ${item.chunkIndex}, ${item.title}, 'pending', NULL, NULL)
         ON CONFLICT (path)
         DO UPDATE SET
           chunk_index = EXCLUDED.chunk_index,
           title = EXCLUDED.title,
-          content = EXCLUDED.content,
           embedding = NULL,
           indexing_status = 'pending',
           indexing_error = NULL,

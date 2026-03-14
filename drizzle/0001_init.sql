@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS documents (
   path TEXT NOT NULL,
   chunk_index INTEGER NOT NULL,
   title TEXT NOT NULL,
-  content TEXT NOT NULL,
   embedding vector(1024),
   indexing_status TEXT NOT NULL DEFAULT 'pending',
   indexing_error TEXT,
