@@ -6,25 +6,14 @@ import { parse } from "csv-parse";
 import postgres from "postgres";
 
 type ImportItem = {
-  source: string;
+  path: string;
   chunkIndex: number;
   title: string;
   content: string;
-  embedding?: number[];
-};
-
-const toInt = (value: string | undefined, fallback: number): number => {
-  if (!value) {
-    return fallback;
-  }
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : fallback;
 };
 
 const config = {
   databaseUrl: process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/embeddings_demo",
-  embeddingsApiUrl: process.env.EMBEDDINGS_API_URL ?? "http://localhost:8080",
-  embeddingDim: toInt(process.env.EMBEDDING_DIM, 1024),
 };
 
 const args = process.argv.slice(2);
@@ -36,40 +25,6 @@ const getArg = (name: string) => {
 const requestedDir = getArg("--dir") ?? "./import";
 const limitArg = getArg("--limit");
 const limit = limitArg ? Number.parseInt(limitArg, 10) : undefined;
-
-const toVectorLiteral = (values: number[]) => `[${values.join(",")}]`;
-
-const ensureDim = (vector: number[]) => {
-  if (vector.length !== config.embeddingDim) {
-    throw new Error(`Embedding size mismatch: expected ${config.embeddingDim}, got ${vector.length}`);
-  }
-};
-
-const normalizeEmbedding = (value: unknown): number[] => {
-  if (!Array.isArray(value)) {
-    throw new Error("Embedding payload is not an array");
-  }
-  const vector = value.map((item) => Number(item));
-  if (vector.some((item) => Number.isNaN(item))) {
-    throw new Error("Embedding payload has non-numeric values");
-  }
-  ensureDim(vector);
-  return vector;
-};
-
-const tryParseEmbedding = (value: unknown): number[] | undefined => {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    const vector = normalizeEmbedding(parsed);
-    return vector;
-  } catch {
-    return undefined;
-  }
-};
 
 const chunkText = (text: string, chunkSize = 1000, overlap = 200): string[] => {
   if (text.length <= chunkSize) {
@@ -89,36 +44,6 @@ const chunkText = (text: string, chunkSize = 1000, overlap = 200): string[] => {
   }
 
   return chunks;
-};
-
-const embedText = async (input: string): Promise<number[]> => {
-  const baseUrl = config.embeddingsApiUrl.replace(/\/$/, "");
-
-  const teiResponse = await fetch(`${baseUrl}/embed`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ inputs: input }),
-  });
-
-  if (teiResponse.ok) {
-    return normalizeEmbedding(await teiResponse.json());
-  }
-
-  const compatResponse = await fetch(`${baseUrl}/v1/embeddings`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ input, model: "local" }),
-  });
-
-  if (!compatResponse.ok) {
-    const body = await compatResponse.text();
-    throw new Error(`Embeddings API error: ${compatResponse.status} ${body}`);
-  }
-
-  const payload = (await compatResponse.json()) as {
-    data?: Array<{ embedding?: unknown }>;
-  };
-  return normalizeEmbedding(payload.data?.[0]?.embedding);
 };
 
 const findBestContentField = (row: Record<string, string>): string | undefined => {
@@ -143,8 +68,19 @@ const findBestTitleField = (row: Record<string, string>, fallback: string): stri
   return fallback;
 };
 
+const findBestPathField = (row: Record<string, string>, fallback: string): string => {
+  const candidates = ["path", "full_path", "category_path"];
+  for (const key of candidates) {
+    const value = row[key];
+    if (value && value.trim().length > 0) {
+      return value.trim().slice(0, 2000);
+    }
+  }
+  return fallback;
+};
+
 async function* importItemsFromFile(filePath: string): AsyncGenerator<ImportItem> {
-  const source = path.basename(filePath);
+  const fileName = path.basename(filePath);
   const ext = path.extname(filePath).toLowerCase();
 
   if (ext === ".txt" || ext === ".md") {
@@ -156,9 +92,9 @@ async function* importItemsFromFile(filePath: string): AsyncGenerator<ImportItem
         continue;
       }
       yield {
-        source,
+        path: `${fileName}#${i}`,
         chunkIndex: i,
-        title: `${source} #${i}`,
+        title: `${fileName} #${i}`,
         content: chunk.trim(),
       };
     }
@@ -179,13 +115,11 @@ async function* importItemsFromFile(filePath: string): AsyncGenerator<ImportItem
       if (!content) {
         continue;
       }
-      const embedding = tryParseEmbedding(record.embedding);
       yield {
-        source,
+        path: String(record.path ?? record.full_path ?? record.category_path ?? `${fileName}#${idx}`).slice(0, 2000),
         chunkIndex: idx,
-        title: String(record.title ?? `${source} #${idx}`).slice(0, 200),
+        title: String(record.title ?? `${fileName} #${idx}`).slice(0, 200),
         content,
-        embedding,
       };
       idx += 1;
     }
@@ -203,13 +137,12 @@ async function* importItemsFromFile(filePath: string): AsyncGenerator<ImportItem
       if (!content) {
         continue;
       }
-      const embedding = tryParseEmbedding(row.embedding ?? row.vector ?? row.embeddings);
+      const pathValue = findBestPathField(row, `${fileName}#${idx}`);
       yield {
-        source,
+        path: pathValue,
         chunkIndex: idx,
-        title: findBestTitleField(row, `${source} #${idx}`),
+        title: findBestTitleField(row, `${fileName} #${idx}`),
         content: content.slice(0, 5000),
-        embedding,
       };
       idx += 1;
     }
@@ -239,14 +172,7 @@ async function main() {
   const files = (await fsp.readdir(dirPath))
     .map((name) => path.join(dirPath, name))
     .filter((fullPath) => fs.statSync(fullPath).isFile())
-    .sort((a, b) => {
-      const aHasEmb = /embedding/i.test(path.basename(a));
-      const bHasEmb = /embedding/i.test(path.basename(b));
-      if (aHasEmb !== bHasEmb) {
-        return aHasEmb ? -1 : 1;
-      }
-      return a.localeCompare(b);
-    });
+    .sort((a, b) => a.localeCompare(b));
 
   if (files.length === 0) {
     console.log(`No files found in ${dirPath}`);
@@ -263,18 +189,18 @@ async function main() {
         return;
       }
 
-      const embedding = item.embedding ?? (await embedText(item.content));
-      ensureDim(embedding);
-      const vectorLiteral = toVectorLiteral(embedding);
-
       await sql`
-        INSERT INTO documents (source, chunk_index, title, content, embedding)
-        VALUES (${item.source}, ${item.chunkIndex}, ${item.title}, ${item.content}, ${vectorLiteral}::vector)
-        ON CONFLICT (source, chunk_index)
+        INSERT INTO documents (path, chunk_index, title, content, indexing_status, indexing_error, indexed_at)
+        VALUES (${item.path}, ${item.chunkIndex}, ${item.title}, ${item.content}, 'pending', NULL, NULL)
+        ON CONFLICT (path)
         DO UPDATE SET
+          chunk_index = EXCLUDED.chunk_index,
           title = EXCLUDED.title,
           content = EXCLUDED.content,
-          embedding = EXCLUDED.embedding
+          embedding = NULL,
+          indexing_status = 'pending',
+          indexing_error = NULL,
+          indexed_at = NULL
       `;
 
       imported += 1;

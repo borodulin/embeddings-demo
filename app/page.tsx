@@ -6,9 +6,9 @@ import styles from "./page.module.css";
 
 type SearchItem = {
   id: number;
+  path: string;
   title: string;
   snippet: string;
-  source: string;
   score: number;
 };
 
@@ -77,7 +77,7 @@ export default function Home() {
         <section className={styles.results}>
           {results.map((item) => (
             <article key={item.id} className={styles.resultCard}>
-              <p className={styles.resultUrl}>{item.source}</p>
+              <p className={styles.resultUrl}>{item.path}</p>
               <h2 className={styles.resultTitle}>{item.title}</h2>
               <p className={styles.resultSnippet}>{item.snippet}</p>
               <p className={styles.resultScore}>score: {item.score.toFixed(4)}</p>

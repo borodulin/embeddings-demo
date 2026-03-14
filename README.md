@@ -5,7 +5,8 @@
 - API на Next.js (`/api/search`, `/api/index`);
 - Postgres + `pgvector`;
 - миграции SQL;
-- импорт данных из папки `import`.
+- импорт данных из папки `import`;
+- отдельная индексация векторов с сохранением статуса в таблице `documents`.
 
 ## 1) Поднять инфраструктуру
 
@@ -49,7 +50,25 @@ tsx scripts/import-data.ts --dir ./import
 npm run import:data -- --limit 100
 ```
 
-## 5) Запустить UI
+## 5) Проиндексировать векторы отдельной командой
+
+```bash
+npm run index:vectors
+```
+
+Для smoke-теста:
+
+```bash
+npm run index:vectors -- --limit 100
+```
+
+Статус хранится в `documents.indexing_status`:
+- `pending` - ожидает индексации;
+- `indexing` - в обработке;
+- `indexed` - успешно проиндексировано;
+- `error` - ошибка, текст в `documents.indexing_error`.
+
+## 6) Запустить UI
 
 ```bash
 npm run dev

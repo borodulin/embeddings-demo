@@ -8,7 +8,7 @@ import { toVectorLiteral } from "@/lib/vector";
 export const runtime = "nodejs";
 
 const documentSchema = z.object({
-  source: z.string().trim().min(1),
+  path: z.string().trim().min(1).optional(),
   chunkIndex: z.number().int().min(0),
   title: z.string().trim().min(1),
   content: z.string().trim().min(1),
@@ -33,17 +33,31 @@ export async function POST(request: Request) {
     let indexed = 0;
 
     for (const doc of documents) {
-      const embedding = await embedText(doc.content);
+      const path = doc.path ?? `${doc.title}-${doc.chunkIndex}`;
+      const embedding = await embedText(path);
       const vectorLiteral = toVectorLiteral(embedding);
 
       await sql`
-        INSERT INTO documents (source, chunk_index, title, content, embedding)
-        VALUES (${doc.source}, ${doc.chunkIndex}, ${doc.title}, ${doc.content}, ${vectorLiteral}::vector)
-        ON CONFLICT (source, chunk_index)
+        INSERT INTO documents (path, chunk_index, title, content, embedding, indexing_status, indexing_error, indexed_at)
+        VALUES (
+          ${path},
+          ${doc.chunkIndex},
+          ${doc.title},
+          ${doc.content},
+          ${vectorLiteral}::vector,
+          'indexed',
+          NULL,
+          NOW()
+        )
+        ON CONFLICT (path)
         DO UPDATE SET
+          chunk_index = EXCLUDED.chunk_index,
           title = EXCLUDED.title,
           content = EXCLUDED.content,
-          embedding = EXCLUDED.embedding
+          embedding = EXCLUDED.embedding,
+          indexing_status = 'indexed',
+          indexing_error = NULL,
+          indexed_at = NOW()
       `;
       indexed += 1;
     }

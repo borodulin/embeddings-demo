@@ -14,10 +14,10 @@ const requestSchema = z.object({
 
 type SearchRow = {
   id: number;
+  path: string;
   title: string;
   snippet: string;
   score: number;
-  source: string;
 };
 
 export async function POST(request: Request) {
@@ -38,11 +38,13 @@ export async function POST(request: Request) {
     const rows = await sql<SearchRow[]>`
       SELECT
         id,
+        path,
         title,
         LEFT(content, 220) AS snippet,
-        source,
         1 - (embedding <=> ${vectorLiteral}::vector) AS score
       FROM documents
+      WHERE embedding IS NOT NULL
+        AND indexing_status = 'indexed'
       ORDER BY embedding <=> ${vectorLiteral}::vector
       LIMIT ${limit}
     `;
@@ -52,9 +54,9 @@ export async function POST(request: Request) {
       count: rows.length,
       results: rows.map((row) => ({
         id: row.id,
+        path: row.path,
         title: row.title,
         snippet: row.snippet,
-        source: row.source,
         score: Number(row.score),
       })),
     });

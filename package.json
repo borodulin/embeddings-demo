@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
-    "import:data": "tsx scripts/import-data.ts --dir ./import"
+    "import:data": "tsx scripts/import-data.ts --dir ./import",
+    "index:vectors": "tsx scripts/index-vectors.ts"
   },
   "dependencies": {
     "csv-parse": "^6.1.0",

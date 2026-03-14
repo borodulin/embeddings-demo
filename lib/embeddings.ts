@@ -6,7 +6,13 @@ const normalizeVector = (value: unknown): number[] => {
     throw new Error("Embedding response is not an array");
   }
 
-  const numbers = value.map((item) => Number(item));
+  const first = value[0];
+  const source =
+    Array.isArray(first) && first.length > 0 && first.every((item) => typeof item === "number")
+      ? first
+      : value;
+
+  const numbers = source.map((item) => Number(item));
   if (numbers.some((item) => Number.isNaN(item))) {
     throw new Error("Embedding contains non-numeric values");
   }

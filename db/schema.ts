@@ -17,14 +17,15 @@ export const documents = pgTable(
   "documents",
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    source: text("source").notNull(),
+    path: text("path").notNull(),
     chunkIndex: integer("chunk_index").notNull(),
     title: text("title").notNull(),
     content: text("content").notNull(),
-    embedding: vector("embedding", { dimensions: 1024 }).notNull(),
+    embedding: vector("embedding", { dimensions: 1024 }),
+    indexingStatus: text("indexing_status").notNull().default("pending"),
+    indexingError: text("indexing_error"),
+    indexedAt: timestamp("indexed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [
-    unique("documents_source_chunk_unique").on(table.source, table.chunkIndex),
-  ],
+  (table) => [unique("documents_path_unique").on(table.path)],
 );

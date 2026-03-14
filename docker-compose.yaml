@@ -36,14 +36,15 @@ services:
     image: node:20-alpine
     working_dir: /app
     volumes:
-      - ./frontend:/app
-      - ./import:/app/import
+      - ./:/app
     ports:
       - '3000:3000'
     user: ${UID:-1000}:${GID:-1000}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/embeddings_demo
-      EMBEDDINGS_API_URL: http://embeddings:80
+      EMBEDDINGS_API_URL: ${EMBEDDINGS_API_URL:-http://host.docker.internal:8080}
       EMBEDDING_DIM: '1024'
     depends_on:
       postgres:

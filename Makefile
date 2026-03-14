@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs ps migrate import import-limit dev build lint
+.PHONY: help up down restart logs ps migrate import import-limit index-vectors index-vectors-limit dev build lint
 
 help:
 	@echo "Available targets:"
@@ -10,6 +10,8 @@ help:
 	@echo "  make migrate       - Run DB migrations in frontend container"
 	@echo "  make import        - Import all data from import folder"
 	@echo "  make import-limit N=100 - Import only N records (smoke test)"
+	@echo "  make index-vectors - Build vectors for pending/error records"
+	@echo "  make index-vectors-limit N=100 - Index only N records (smoke test)"
 	@echo "  make dev           - Run frontend dev server locally"
 	@echo "  make build         - Build frontend locally"
 	@echo "  make lint          - Lint frontend locally"
@@ -39,6 +41,12 @@ import:
 
 import-limit:
 	docker compose exec frontend sh -lc "npm run import:data -- --limit $${N:-100}"
+
+index-vectors:
+	docker compose exec frontend sh -lc "npm run index:vectors"
+
+index-vectors-limit:
+	docker compose exec frontend sh -lc "npm run index:vectors -- --limit $${N:-100}"
 
 dev:
 	cd frontend && npm run dev
