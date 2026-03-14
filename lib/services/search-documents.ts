@@ -1,6 +1,7 @@
 import { embedText } from "../embeddings";
 import { EMBEDDING_MODELS, type EmbeddingModel } from "../models";
 import { searchDocumentsByModel } from "../repositories/document-vectors";
+import { searchDocumentsFullText } from "../repositories/documents";
 import { toVectorLiteral } from "../vector";
 
 export type SearchResultItem = {
@@ -32,9 +33,15 @@ const normalizeErrorMessage = (error: unknown): string =>
 export const searchDocuments = async (
   query: string,
   limit: number,
-): Promise<{ query: string; resultsByModel: SearchResultsByModel; errorsByModel: SearchErrorsByModel }> => {
+): Promise<{
+  query: string;
+  fullTextResults: SearchResultItem[];
+  resultsByModel: SearchResultsByModel;
+  errorsByModel: SearchErrorsByModel;
+}> => {
   const resultsByModel = emptyResultsByModel();
   const errorsByModel = emptyErrorsByModel();
+  const fullTextRows = await searchDocumentsFullText(query, limit);
 
   await Promise.all(
     EMBEDDING_MODELS.map(async (model) => {
@@ -55,5 +62,16 @@ export const searchDocuments = async (
     }),
   );
 
-  return { query, resultsByModel, errorsByModel };
+  return {
+    query,
+    fullTextResults: fullTextRows.map((row) => ({
+      id: row.id,
+      path: row.path,
+      title: row.title,
+      snippet: row.snippet,
+      score: Number(row.score),
+    })),
+    resultsByModel,
+    errorsByModel,
+  };
 };

@@ -12,7 +12,8 @@
     "import:data": "tsx scripts/import-data.ts --dir ./import",
     "index:vectors": "tsx scripts/index-vectors.ts",
     "get:vector": "tsx scripts/get-vector.ts",
-    "smoke:index:openai": "tsx scripts/smoke-openai-index.ts"
+    "smoke:index:openai": "tsx scripts/smoke-openai-index.ts",
+    "benchmark:search": "tsx scripts/benchmark-search.ts"
   },
   "dependencies": {
     "csv-parse": "^6.1.0",

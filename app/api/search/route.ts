@@ -23,7 +23,12 @@ export async function POST(request: Request) {
 
   try {
     const result = await searchDocuments(query, limit);
-    return NextResponse.json(result);
+    return NextResponse.json({
+      query: result.query,
+      fullTextResults: result.fullTextResults,
+      resultsByModel: result.resultsByModel,
+      errorsByModel: result.errorsByModel,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Search failed" },

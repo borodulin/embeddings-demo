@@ -27,3 +27,23 @@ export const upsertDocument = async (params: UpsertDocumentParams): Promise<numb
 
   return rows[0].id;
 };
+
+export const searchDocumentsFullText = async (query: string, limit: number): Promise<SearchRow[]> => {
+  const rows = await sql<SearchRow[]>`
+    SELECT
+      id,
+      path,
+      title,
+      LEFT(path, 220) AS snippet,
+      ts_rank(search_vector, plainto_tsquery('russian', ${query})) AS score
+    FROM documents
+    WHERE search_vector @@ plainto_tsquery('russian', ${query})
+    ORDER BY score DESC, id ASC
+    LIMIT ${limit}
+  `;
+
+  return rows.map((row) => ({
+    ...row,
+    score: Number(row.score),
+  }));
+};

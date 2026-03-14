@@ -24,6 +24,7 @@ type SearchItem = {
 
 type ResultsByModel = Record<ModelKey, SearchItem[]>;
 type ErrorsByModel = Record<ModelKey, string | null>;
+type SearchMethodKey = "full_text" | ModelKey;
 
 const emptyResultsByModel = (): ResultsByModel => ({
   qwen3_embedding_0_6b: [],
@@ -41,6 +42,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fullTextResults, setFullTextResults] = useState<SearchItem[]>([]);
   const [resultsByModel, setResultsByModel] = useState<ResultsByModel>(emptyResultsByModel);
   const [errorsByModel, setErrorsByModel] = useState<ErrorsByModel>(emptyErrorsByModel);
 
@@ -48,11 +50,36 @@ export default function Home() {
     () =>
       !loading &&
       !error &&
+      fullTextResults.length === 0 &&
       MODEL_ORDER.every(
         (model) => resultsByModel[model].length === 0 && (errorsByModel[model] === null || errorsByModel[model] === ""),
       ),
-    [error, errorsByModel, loading, resultsByModel],
+    [error, errorsByModel, fullTextResults.length, loading, resultsByModel],
   );
+
+  const methodOrder: SearchMethodKey[] = useMemo(
+    () => ["full_text", ...MODEL_ORDER],
+    [],
+  );
+
+  const getMethodLabel = (method: SearchMethodKey): string => {
+    if (method === "full_text") {
+      return "Full-text (PostgreSQL)";
+    }
+
+    return MODEL_LABELS[method];
+  };
+
+  const getMethodResults = (method: SearchMethodKey): SearchItem[] => {
+    if (method === "full_text") {
+      return fullTextResults;
+    }
+
+    return resultsByModel[method];
+  };
+
+  const getMethodError = (method: SearchMethodKey): string | null =>
+    method === "full_text" ? null : errorsByModel[method];
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -63,6 +90,7 @@ export default function Home() {
 
     setLoading(true);
     setError(null);
+    setFullTextResults([]);
     setErrorsByModel(emptyErrorsByModel());
 
     try {
@@ -76,6 +104,7 @@ export default function Home() {
 
       const payload = (await response.json()) as {
         error?: string;
+        fullTextResults?: SearchItem[];
         resultsByModel?: Partial<ResultsByModel>;
         errorsByModel?: Partial<ErrorsByModel>;
       };
@@ -83,6 +112,7 @@ export default function Home() {
         throw new Error(payload.error ?? "Search request failed");
       }
 
+      setFullTextResults(payload.fullTextResults ?? []);
       setResultsByModel({
         qwen3_embedding_0_6b: payload.resultsByModel?.qwen3_embedding_0_6b ?? [],
         gigachat: payload.resultsByModel?.gigachat ?? [],
@@ -94,6 +124,7 @@ export default function Home() {
         text_embedding_3_small: payload.errorsByModel?.text_embedding_3_small ?? null,
       });
     } catch (requestError) {
+      setFullTextResults([]);
       setResultsByModel(emptyResultsByModel());
       setErrorsByModel(emptyErrorsByModel());
       setError(requestError instanceof Error ? requestError.message : "Search request failed");
@@ -124,15 +155,19 @@ export default function Home() {
         {showEmpty ? <p className={styles.hint}>Введите запрос и нажмите поиск</p> : null}
 
         <section className={styles.results}>
-          {MODEL_ORDER.map((model) => (
-            <section key={model} className={styles.modelColumn}>
-              <h2 className={styles.modelTitle}>{MODEL_LABELS[model]}</h2>
-              {errorsByModel[model] ? <p className={styles.error}>{errorsByModel[model]}</p> : null}
-              {!errorsByModel[model] && resultsByModel[model].length === 0 ? (
+          {methodOrder.map((method) => {
+            const methodError = getMethodError(method);
+            const methodResults = getMethodResults(method);
+
+            return (
+            <section key={method} className={styles.modelColumn}>
+              <h2 className={styles.modelTitle}>{getMethodLabel(method)}</h2>
+              {methodError ? <p className={styles.error}>{methodError}</p> : null}
+              {!methodError && methodResults.length === 0 ? (
                 <p className={styles.hint}>Нет результатов</p>
               ) : null}
-              {resultsByModel[model].map((item) => (
-                <article key={`${model}-${item.id}`} className={styles.resultCard}>
+              {methodResults.map((item) => (
+                <article key={`${method}-${item.id}`} className={styles.resultCard}>
                   <p className={styles.resultUrl}>{item.path}</p>
                   <h3 className={styles.resultTitle}>{item.title}</h3>
                   <p className={styles.resultSnippet}>{item.snippet}</p>
@@ -140,7 +175,8 @@ export default function Home() {
                 </article>
               ))}
             </section>
-          ))}
+            );
+          })}
         </section>
       </main>
     </div>
