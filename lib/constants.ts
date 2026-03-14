@@ -1,6 +1,6 @@
 export const MODEL_DIMENSIONS = {
   qwen3_embedding_0_6b: 1024,
-  gigachat: 1024,
+  gigachat: 2560,
   text_embedding_3_small: 1536,
 } as const;
 

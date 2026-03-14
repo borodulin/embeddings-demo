@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import "./_shared/env";
 import { createScriptDb } from "./_shared/db";
 
 const client = createScriptDb();

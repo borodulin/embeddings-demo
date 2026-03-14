@@ -31,18 +31,13 @@ CREATE INDEX IF NOT EXISTS document_vectors_qwen3_embedding_0_6b_indexing_status
 CREATE TABLE IF NOT EXISTS document_vectors_gigachat (
   id BIGSERIAL PRIMARY KEY,
   document_id BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-  embedding vector(1024),
+  embedding vector(2560),
   indexing_status TEXT NOT NULL DEFAULT 'pending',
   indexing_error TEXT,
   indexed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT document_vectors_gigachat_document_unique UNIQUE (document_id)
 );
-
-CREATE INDEX IF NOT EXISTS document_vectors_gigachat_embedding_ivfflat_idx
-  ON document_vectors_gigachat
-  USING ivfflat (embedding vector_cosine_ops)
-  WITH (lists = 100);
 
 CREATE INDEX IF NOT EXISTS document_vectors_gigachat_indexing_status_idx
   ON document_vectors_gigachat (indexing_status);

@@ -1,3 +1,5 @@
+import "./_shared/env";
+
 import { EMBEDDING_MODELS, isEmbeddingModel, type EmbeddingModel } from "../lib/models";
 import { indexPendingVectorsByModel } from "../lib/services/index-documents";
 import { getArg, parseOptionalIntArg, toInt } from "./_shared/cli";

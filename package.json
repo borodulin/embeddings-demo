@@ -10,10 +10,12 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "import:data": "tsx scripts/import-data.ts --dir ./import",
-    "index:vectors": "tsx scripts/index-vectors.ts"
+    "index:vectors": "tsx scripts/index-vectors.ts",
+    "get:vector": "tsx scripts/get-vector.ts"
   },
   "dependencies": {
     "csv-parse": "^6.1.0",
+    "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
     "next": "16.1.6",
     "postgres": "^3.4.8",

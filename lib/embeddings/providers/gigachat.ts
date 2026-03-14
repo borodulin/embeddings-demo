@@ -34,7 +34,7 @@ const getGigaChatToken = async ({
     method: "POST",
     headers: {
       Authorization: authHeader,
-      RqUID: crypto.randomUUID().replace(/-/g, ""),
+      RqUID: crypto.randomUUID(),
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
     },

@@ -6,7 +6,7 @@
 - Postgres + `pgvector`;
 - хранение векторов в отдельных таблицах:
   - `document_vectors_qwen3_embedding_0_6b` (`vector(1024)`);
-  - `document_vectors_gigachat` (`vector(1024)`);
+  - `document_vectors_gigachat` (`vector(2560)`);
   - `document_vectors_text_embedding_3_small` (`vector(1536)`);
 - импорт данных из папки `import`;
 - отдельная индексация векторов с сохранением статусов по каждой модели.
@@ -78,6 +78,18 @@ npm run index:vectors -- --model qwen3_embedding_0_6b
 ```
 
 Доступные значения `--model`: `qwen3_embedding_0_6b`, `gigachat`, `text_embedding_3_small`.
+
+## Диагностика: получить вектор по модели
+
+```bash
+npm run get:vector -- --model qwen3_embedding_0_6b --text "кроссовки nike"
+```
+
+Полный вектор JSON:
+
+```bash
+npm run get:vector -- --model text_embedding_3_small --text "кроссовки nike" --json
+```
 
 Статус хранится в model-specific таблицах (`document_vectors_*`). Значения:
 - `pending` - ожидает индексации;

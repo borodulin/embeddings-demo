@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { parse } from "csv-parse";
 
+import "./_shared/env";
 import { getArg, parseOptionalIntArg } from "./_shared/cli";
 import { createScriptDb } from "./_shared/db";
 
