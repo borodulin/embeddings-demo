@@ -45,7 +45,18 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/embeddings_demo
       EMBEDDINGS_API_URL: ${EMBEDDINGS_API_URL:-http://host.docker.internal:8080}
-      EMBEDDING_DIM: '1024'
+      EMBEDDINGS_API_URL_QWEN3_EMBEDDING_0_6B: ${EMBEDDINGS_API_URL_QWEN3_EMBEDDING_0_6B:-http://host.docker.internal:8080}
+      EMBEDDINGS_API_URL_GIGACHAT: ${EMBEDDINGS_API_URL_GIGACHAT:-http://host.docker.internal:8080}
+      EMBEDDINGS_API_URL_OPENAI: ${EMBEDDINGS_API_URL_OPENAI:-http://host.docker.internal:8080}
+      EMBEDDINGS_MODEL_QWEN3_EMBEDDING_0_6B: ${EMBEDDINGS_MODEL_QWEN3_EMBEDDING_0_6B:-Qwen/Qwen3-Embedding-0.6B}
+      EMBEDDINGS_MODEL_GIGACHAT: ${EMBEDDINGS_MODEL_GIGACHAT:-EmbeddingsGigaR}
+      EMBEDDINGS_MODEL_OPENAI: ${EMBEDDINGS_MODEL_OPENAI:-text-embedding-3-small}
+      GIGACHAT_AUTH_KEY: ${GIGACHAT_AUTH_KEY:-}
+      GIGACHAT_SCOPE: ${GIGACHAT_SCOPE:-GIGACHAT_API_PERS}
+      GIGACHAT_OAUTH_URL: ${GIGACHAT_OAUTH_URL:-https://ngw.devices.sberbank.ru:9443/api/v2/oauth}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_ORGANIZATION: ${OPENAI_ORGANIZATION:-}
+      OPENAI_PROXY_URL: ${OPENAI_PROXY_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

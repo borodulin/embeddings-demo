@@ -8,7 +8,7 @@
 
 .main {
   width: 100%;
-  max-width: 760px;
+  max-width: 1240px;
   padding: 68px 24px 100px;
 }
 
@@ -68,9 +68,25 @@
 
 .results {
   margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.modelColumn {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 26px;
+  gap: 16px;
+  min-height: 260px;
+}
+
+.modelTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
 }
 
 .resultCard {
@@ -116,5 +132,9 @@
 
   .searchButton {
     width: 100%;
+  }
+
+  .results {
+    grid-template-columns: 1fr;
   }
 }

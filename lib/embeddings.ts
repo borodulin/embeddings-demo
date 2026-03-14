@@ -1,7 +1,11 @@
 import { config } from "./config";
+import type { EmbeddingModel } from "./models";
 import { ensureEmbeddingDim } from "./vector";
+import { embedWithGigaChatProvider } from "./embeddings/providers/gigachat";
+import { embedWithOpenAiProvider } from "./embeddings/providers/openai";
+import { embedWithQwenProvider } from "./embeddings/providers/qwen";
 
-const normalizeVector = (value: unknown): number[] => {
+const normalizeVector = (value: unknown, model: EmbeddingModel): number[] => {
   if (!Array.isArray(value)) {
     throw new Error("Embedding response is not an array");
   }
@@ -17,44 +21,44 @@ const normalizeVector = (value: unknown): number[] => {
     throw new Error("Embedding contains non-numeric values");
   }
 
-  ensureEmbeddingDim(numbers);
+  ensureEmbeddingDim(numbers, model);
   return numbers;
 };
 
-export const embedText = async (input: string): Promise<number[]> => {
-  const baseUrl = config.embeddingsApiUrl.replace(/\/$/, "");
-
-  const teiResponse = await fetch(`${baseUrl}/embed`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ inputs: input }),
-    cache: "no-store",
-  });
-
-  if (teiResponse.ok) {
-    const payload = (await teiResponse.json()) as unknown;
-    return normalizeVector(payload);
+export const embedText = async (input: string, model: EmbeddingModel): Promise<number[]> => {
+  switch (model) {
+    case "qwen3_embedding_0_6b":
+      return normalizeVector(
+        await embedWithQwenProvider({
+          baseUrl: config.embeddingsApiUrls.qwen3_embedding_0_6b,
+          input,
+          modelName: config.embeddingsProviderModelNames.qwen3_embedding_0_6b,
+        }),
+        model,
+      );
+    case "gigachat":
+      return normalizeVector(
+        await embedWithGigaChatProvider({
+          apiUrl: config.embeddingsApiUrls.gigachat,
+          oauthUrl: config.gigaChatOauthUrl,
+          authKey: config.gigaChatAuthKey,
+          scope: config.gigaChatScope,
+          modelName: config.embeddingsProviderModelNames.gigachat,
+          input,
+        }),
+        model,
+      );
+    case "text_embedding_3_small":
+      return normalizeVector(
+        await embedWithOpenAiProvider({
+          baseUrl: config.embeddingsApiUrls.text_embedding_3_small,
+          proxyUrl: config.openAiProxyUrl,
+          input,
+          modelName: config.embeddingsProviderModelNames.text_embedding_3_small,
+          apiKey: config.openAiApiKey,
+          organization: config.openAiOrganization,
+        }),
+        model,
+      );
   }
-
-  const openAiCompatResponse = await fetch(`${baseUrl}/v1/embeddings`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ input, model: "local" }),
-    cache: "no-store",
-  });
-
-  if (!openAiCompatResponse.ok) {
-    const errorText = await openAiCompatResponse.text();
-    throw new Error(`Embeddings API error: ${openAiCompatResponse.status} ${errorText}`);
-  }
-
-  const payload = (await openAiCompatResponse.json()) as {
-    data?: Array<{ embedding?: unknown }>;
-  };
-  const vector = payload.data?.[0]?.embedding;
-  return normalizeVector(vector);
 };

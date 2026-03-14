@@ -23,10 +23,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await searchDocuments(query, limit);
-    return NextResponse.json({
-      ...result,
-      count: result.results.length,
-    });
+    return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Search failed" },

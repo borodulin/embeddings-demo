@@ -139,6 +139,41 @@ async function main() {
   const dirPath = await resolveImportDir(requestedDir);
   const sql = createScriptDb();
 
+  const setPendingVectors = async (documentId: number) => {
+    await sql`
+      INSERT INTO document_vectors_qwen3_embedding_0_6b (document_id, embedding, indexing_status, indexing_error, indexed_at)
+      VALUES (${documentId}, NULL, 'pending', NULL, NULL)
+      ON CONFLICT (document_id)
+      DO UPDATE SET
+        embedding = NULL,
+        indexing_status = 'pending',
+        indexing_error = NULL,
+        indexed_at = NULL
+    `;
+
+    await sql`
+      INSERT INTO document_vectors_gigachat (document_id, embedding, indexing_status, indexing_error, indexed_at)
+      VALUES (${documentId}, NULL, 'pending', NULL, NULL)
+      ON CONFLICT (document_id)
+      DO UPDATE SET
+        embedding = NULL,
+        indexing_status = 'pending',
+        indexing_error = NULL,
+        indexed_at = NULL
+    `;
+
+    await sql`
+      INSERT INTO document_vectors_text_embedding_3_small (document_id, embedding, indexing_status, indexing_error, indexed_at)
+      VALUES (${documentId}, NULL, 'pending', NULL, NULL)
+      ON CONFLICT (document_id)
+      DO UPDATE SET
+        embedding = NULL,
+        indexing_status = 'pending',
+        indexing_error = NULL,
+        indexed_at = NULL
+    `;
+  };
+
   const files = (await fsp.readdir(dirPath))
     .map((name) => path.join(dirPath, name))
     .filter((fullPath) => fs.statSync(fullPath).isFile())
@@ -159,18 +194,16 @@ async function main() {
         return;
       }
 
-      await sql`
-        INSERT INTO documents (path, chunk_index, title, indexing_status, indexing_error, indexed_at)
-        VALUES (${item.path}, ${item.chunkIndex}, ${item.title}, 'pending', NULL, NULL)
+      const rows = await sql<{ id: number }[]>`
+        INSERT INTO documents (path, chunk_index, title)
+        VALUES (${item.path}, ${item.chunkIndex}, ${item.title})
         ON CONFLICT (path)
         DO UPDATE SET
           chunk_index = EXCLUDED.chunk_index,
-          title = EXCLUDED.title,
-          embedding = NULL,
-          indexing_status = 'pending',
-          indexing_error = NULL,
-          indexed_at = NULL
+          title = EXCLUDED.title
+        RETURNING id
       `;
+      await setPendingVectors(rows[0].id);
 
       imported += 1;
       if (imported % 50 === 0) {

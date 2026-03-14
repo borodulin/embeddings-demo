@@ -1,12 +1,6 @@
-import { embedText } from "../lib/embeddings";
-import { toVectorLiteral } from "../lib/vector";
+import { EMBEDDING_MODELS, isEmbeddingModel, type EmbeddingModel } from "../lib/models";
+import { indexPendingVectorsByModel } from "../lib/services/index-documents";
 import { getArg, parseOptionalIntArg, toInt } from "./_shared/cli";
-import { createScriptDb } from "./_shared/db";
-
-type DocumentRow = {
-  id: number;
-  path: string;
-};
 
 const scriptConfig = {
   batchSize: toInt(process.env.INDEX_BATCH_SIZE, 50),
@@ -15,85 +9,54 @@ const scriptConfig = {
 const args = process.argv.slice(2);
 
 const limitArg = getArg(args, "--limit");
-const limit = parseOptionalIntArg(limitArg);
+const limitPerModelArg = getArg(args, "--limit-per-model");
+const limitPerModel = parseOptionalIntArg(limitPerModelArg ?? limitArg);
+const modelArg = getArg(args, "--model");
 
 const batchArg = getArg(args, "--batch");
 const batchSize = parseOptionalIntArg(batchArg) ?? scriptConfig.batchSize;
-
-const normalizeErrorMessage = (error: unknown): string => {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.slice(0, 1000);
-};
 
 async function main() {
   if (!Number.isFinite(batchSize) || batchSize <= 0) {
     throw new Error(`Invalid --batch value: ${batchArg}`);
   }
 
-  const sql = createScriptDb();
-  let processed = 0;
-  let indexed = 0;
-  let failed = 0;
-
-  while (!limit || processed < limit) {
-    const take = limit ? Math.min(batchSize, Math.max(limit - processed, 0)) : batchSize;
-    if (take === 0) {
-      break;
-    }
-
-    const docs = await sql<DocumentRow[]>`
-      SELECT id, path
-      FROM documents
-      WHERE embedding IS NULL
-        AND indexing_status IN ('pending', 'error')
-      ORDER BY id
-      LIMIT ${take}
-    `;
-
-    if (docs.length === 0) {
-      break;
-    }
-
-    for (const doc of docs) {
-      await sql`
-        UPDATE documents
-        SET indexing_status = 'indexing',
-            indexing_error = NULL
-        WHERE id = ${doc.id}
-      `;
-
-      try {
-        const embedding = await embedText(doc.path);
-        const vectorLiteral = toVectorLiteral(embedding);
-
-        await sql`
-          UPDATE documents
-          SET embedding = ${vectorLiteral}::vector,
-              indexing_status = 'indexed',
-              indexing_error = NULL,
-              indexed_at = NOW()
-          WHERE id = ${doc.id}
-        `;
-        indexed += 1;
-      } catch (error) {
-        await sql`
-          UPDATE documents
-          SET indexing_status = 'error',
-              indexing_error = ${normalizeErrorMessage(error)}
-          WHERE id = ${doc.id}
-        `;
-        failed += 1;
-      }
-
-      processed += 1;
-      if (processed % 50 === 0) {
-        console.log(`Processed ${processed} records (indexed: ${indexed}, failed: ${failed})...`);
-      }
-    }
+  if (modelArg && !isEmbeddingModel(modelArg)) {
+    throw new Error(
+      `Invalid --model value: ${modelArg}. Allowed: ${EMBEDDING_MODELS.join(", ")}`,
+    );
   }
 
-  await sql.end();
-  console.log(`Vector indexing finished. Processed: ${processed}, indexed: ${indexed}, failed: ${failed}`);
+  const modelsToIndex: EmbeddingModel[] = modelArg ? [modelArg] : [...EMBEDDING_MODELS];
+
+  let processedTotal = 0;
+  const indexedByModel: Record<EmbeddingModel, number> = {
+    qwen3_embedding_0_6b: 0,
+    gigachat: 0,
+    text_embedding_3_small: 0,
+  };
+  const failedByModel: Record<EmbeddingModel, number> = {
+    qwen3_embedding_0_6b: 0,
+    gigachat: 0,
+    text_embedding_3_small: 0,
+  };
+
+  for (const model of modelsToIndex) {
+    const modelResult = await indexPendingVectorsByModel({
+      model,
+      batchSize,
+      limitPerModel,
+    });
+
+    indexedByModel[model] = modelResult.indexed;
+    failedByModel[model] = modelResult.failed;
+    processedTotal += modelResult.processed;
+    console.log(`Model ${model}: processed=${modelResult.processed}, indexed=${modelResult.indexed}, failed=${modelResult.failed}`);
+  }
+
+  console.log(
+    `Vector indexing finished. Processed: ${processedTotal}, qwen(indexed:${indexedByModel.qwen3_embedding_0_6b},failed:${failedByModel.qwen3_embedding_0_6b}), gigachat(indexed:${indexedByModel.gigachat},failed:${failedByModel.gigachat}), text-embedding-3-small(indexed:${indexedByModel.text_embedding_3_small},failed:${failedByModel.text_embedding_3_small})`,
+  );
 }
 
 main().catch((error) => {
